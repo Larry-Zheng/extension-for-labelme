@@ -12,3 +12,6 @@ Copy the two scripts to the path  where you store your json files . Then in the 
 ![img](https://github.com/Larry-Zheng/extension-for-labelme/blob/master/3.PNG)
 ![img](https://github.com/Larry-Zheng/extension-for-labelme/blob/master/4.PNG)
 
+## merged
+![img](https://github.com/Larry-Zheng/extension-for-labelme/blob/master/merge.PNG)
+
