@@ -25,7 +25,6 @@ class imgToSplit():
         self.splitImage()
         self.gen_4sub_json()
         self.justDrawLabel()
-        self.mapPiecesToJson()
         self.saveSubJson()
 
     
@@ -155,10 +154,11 @@ class imgToSplit():
                     label_name_to_value[label_name] = label_value
 
             lbl = shapes_to_label(img.shape, shapes, label_name_to_value)
-            lblsave(r'.\labelme_temp\%s_label_%s.png' % (self.objName,cateName), lbl)
+            self._mapPiecesToJson(cateName,lbl)
+            # lblsave(r'.\labelme_temp\%s_label_%s.png' % (self.objName,cateName), lbl)
 
 
-    def mapPiecesToJson(self):
+    def _mapPiecesToJson(self,cate,img):
         """ 4th 读取label_png图片 分割 并将每块 映射到对应的sub json"""
 
         def generateNewShape(labelName,pointSet):
@@ -174,45 +174,45 @@ class imgToSplit():
 
 
 
-        for cate in self.category:
-            img = cv2.imread(r'.\labelme_temp\%s_label_%s.png' % (self.objName,cate),0)
+
+        # img = cv2.imread(r'.\labelme_temp\%s_label_%s.png' % (self.objName,cate),0)
+        img = np.uint8(img)
+
+
+        #横竖两道杠
+        img[:, self.half_w - 2: self.half_w + 3] = 0
+        img[self.half_h - 2:self.half_h + 3, :] = 0
+
+        #找到轮廓并拟合
+        _, contours, _ = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        aprox = [cv2.approxPolyDP(c, 1, True) for c in contours]
+        aprox = [a.reshape(-1,2) for a in aprox if len(a)>=3] #过滤掉长度不符合规范的点 并reshape
+        aprox = [a for a in aprox if (np.std(a,axis=0) > 2).all() ] #过滤掉 噪声点 （纠结在一团的小块）
 
 
 
-            #横竖两道杠
-            img[:, self.half_w - 2: self.half_w + 3] = 0
-            img[self.half_h - 2:self.half_h + 3, :] = 0
+        for pointSet in aprox:
 
-            #找到轮廓并拟合
-            _, contours, _ = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-            aprox = [cv2.approxPolyDP(c, 1, True) for c in contours]
-            aprox = [a.reshape(-1,2) for a in aprox if len(a)>=3] #过滤掉长度不符合规范的点 并reshape
-            aprox = [a for a in aprox if (np.std(a,axis=0) > 2).all() ] #过滤掉 噪声点 （纠结在一团的小块）
+            #任意取出一点 作为判断 在哪个象限标注
+            judgeX = pointSet[0,0]
+            judgeY = pointSet[0,1]
 
+            if judgeX < self.half_w and judgeY < self.half_h:
+                order = 0
+            elif judgeX > self.half_w and judgeY < self.half_h:
+                order = 1
+            elif judgeX < self.half_w and judgeY > self.half_h:
+                order = 2
+            elif judgeX > self.half_w and judgeY > self.half_h:
+                order = 3
 
-
-            for pointSet in aprox:
-
-                #任意取出一点 作为判断 在哪个象限标注
-                judgeX = pointSet[0,0]
-                judgeY = pointSet[0,1]
-
-                if judgeX < self.half_w and judgeY < self.half_h:
-                    order = 0
-                elif judgeX > self.half_w and judgeY < self.half_h:
-                    order = 1
-                elif judgeX < self.half_w and judgeY > self.half_h:
-                    order = 2
-                elif judgeX > self.half_w and judgeY > self.half_h:
-                    order = 3
-
-                #减去偏移量
-                pointSet -= self.disp[order]
+            #减去偏移量
+            pointSet -= self.disp[order]
 
 
-                #写入json
-                self.sub_json_list[order]\
-                ['shapes'].append(generateNewShape(cate,pointSet.tolist()))
+            #写入json
+            self.sub_json_list[order]\
+            ['shapes'].append(generateNewShape(cate,pointSet.tolist()))
 
 
             # os.remove(r'.\labelme_temp\%s_label_%s.png'% (self.objName,cate))
@@ -255,9 +255,7 @@ if __name__ == '__main__':
     if not os.path.exists(r'.\target'):
         os.mkdir(r'.\target')
 
-    #存放中间过程label 类别图片
-    if not os.path.exists(r'.\labelme_temp'):
-        os.mkdir(r'.\labelme_temp')
+
 
     imgFiles = [ f for f in os.listdir('.') if 'jpg' in f or 'JPG' in f]
     # for file in imgFiles:
@@ -266,4 +264,4 @@ if __name__ == '__main__':
     pool = Pool(processes=4)
     pool.map(mission,imgFiles)
     print('done!')
-    shutil.rmtree(r'.\labelme_temp')
+
